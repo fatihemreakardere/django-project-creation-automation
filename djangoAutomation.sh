@@ -5,11 +5,8 @@ set -euo pipefail
 trap 'deactivate 2>/dev/null || true' EXIT
 
 ###############################################################################
-# Configuration –- set to RAW *folder* URL that contains Dockerfile etc.
-###############################################################################
 DOCKER_TEMPLATE_BASE="https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/docker"
 
-###############################################################################
 # Tiny colour helpers
 ###############################################################################
 if [[ -t 1 ]]; then
