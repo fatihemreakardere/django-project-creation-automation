@@ -7,7 +7,7 @@ trap 'deactivate 2>/dev/null || true' EXIT
 ###############################################################################
 # Configuration –- set to RAW *folder* URL that contains Dockerfile etc.
 ###############################################################################
-DOCKER_TEMPLATE_BASE="https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/main/docker"
+DOCKER_TEMPLATE_BASE="https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/docker"
 
 ###############################################################################
 # Tiny colour helpers
@@ -135,7 +135,7 @@ ENV
   cd src
   python manage.py createsuperuser --username "$ADMIN_USER" \
                                    --email    "$ADMIN_EMAIL" --noinput
-  python manage.py shell - <<PY
+  python manage.py shell <<PY
 from django.contrib.auth import get_user_model
 u=get_user_model().objects.get(username="$ADMIN_USER")
 u.set_password("$ADMIN_PASS"); u.save()
