@@ -8,11 +8,11 @@ email = os.getenv("DJANGO_SUPERUSER_EMAIL")
 password = os.getenv("DJANGO_SUPERUSER_PASSWORD")
 project_name = os.getenv("DJANGO_PROJECT_NAME")
 
-if len(username) = 0:
+if len(username) == 0:
     username = "admin"
-if len(email) = 0:
+if len(email) == 0:
     email = f"admin@{project_name}.com"
-if len(password) = 0:
+if len(password) == 0:
     password = "admin"
 
 if not username or not password:
