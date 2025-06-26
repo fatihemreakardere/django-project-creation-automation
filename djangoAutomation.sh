@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
+# Django project bootstrap script – June 2025
 
 set -euo pipefail
-trap 'deactivate 2>/dev/null || true' EXIT     # leave the venv cleanly
+trap 'deactivate 2>/dev/null || true' EXIT   # always leave the venv cleanly
 
 # ── Colour helpers ────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then
@@ -47,8 +48,8 @@ main() {
     if   command -v apt-get >/dev/null; then
       sudo apt-get update -qq
       sudo apt-get install -y python3 python3-venv python3-pip build-essential libpq-dev
-    elif command -v brew >/dev/null; then brew install python
-    elif command -v dnf  >/dev/null; then
+    elif command -v brew >/dev/null;   then brew install python
+    elif command -v dnf  >/dev/null;   then
       sudo dnf install -y python3 python3-virtualenv python3-pip gcc postgresql-devel
     else
       echo "Package manager not recognised – install Python 3 manually."; exit 1
@@ -58,10 +59,11 @@ main() {
   # Project skeleton ----------------------------------------------------------
   mkdir -p "$PROJECT" && cd "$PROJECT"
 
-  # Write .gitignore (always) --------------------------------------------------
-  if command -v curl >/dev/null && \
+  # .gitignore (always) -------------------------------------------------------
+  if command -v curl >/dev/null &&
      curl -fsSL https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore \
           -o .gitignore; then
+    echo "/.env" >> .gitignore   # make sure secrets stay out of Git
     echo "${GREEN}✔ Downloaded Python .gitignore.${RESET}"
   else
     cat > .gitignore <<'GI'
@@ -69,6 +71,7 @@ main() {
 .venv/
 __pycache__/
 *.py[cod]
+.env
 GI
     echo "${YELLOW}Used fallback .gitignore – install curl for full template.${RESET}"
   fi
@@ -78,18 +81,43 @@ GI
   # shellcheck source=/dev/null
   source .venv/bin/activate 2>/dev/null || source .venv/Scripts/activate
 
-  # Dependencies --------------------------------------------------------------
+  # Requirements (+python-decouple) ------------------------------------------
   cat > requirements.txt <<'REQ'
 Django>=5.2,<6
 djangorestframework>=3.15,<4
+python-decouple>=3.8,<4
 REQ
+
   python -m pip install -q --upgrade pip
   python -m pip install -q --no-cache-dir -r requirements.txt
 
-  # Django project in src/ ----------------------------------------------------
+  # Django project inside src/ -----------------------------------------------
   mkdir -p src && cd src
   django-admin startproject "$PROJECT" .
   python manage.py migrate --noinput
+
+  # Generate .env -------------------------------------------------------------
+  local SECRET_KEY
+  SECRET_KEY=$(python - <<PY
+import secrets, sys; print(secrets.token_urlsafe(50))
+PY
+)
+  cat > ../.env <<ENV
+# Django settings read via python-decouple
+DEBUG=True
+SECRET_KEY=${SECRET_KEY}
+ALLOWED_HOSTS=127.0.0.1,localhost
+ENV
+  echo "${GREEN}✔ .env generated.${RESET}"
+
+  # Patch settings.py to use decouple -----------------------------------------
+  local SETTINGS_FILE="$PROJECT/settings.py"
+  sed -i "1i from decouple import config, Csv" "$SETTINGS_FILE"
+  sed -i "s/^SECRET_KEY = .*/SECRET_KEY = config('SECRET_KEY')/"     "$SETTINGS_FILE"
+  sed -i "s/^DEBUG = .*/DEBUG = config('DEBUG', cast=bool)/"         "$SETTINGS_FILE"
+  # Replace entire ALLOWED_HOSTS line (may span two lines in Django≥5.0)
+  sed -i "s/^ALLOWED_HOSTS.*/ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())/" \
+    "$SETTINGS_FILE"
 
   # Super-user setup ----------------------------------------------------------
   if [[ $NONINTERACTIVE -eq 0 ]]; then
@@ -114,7 +142,7 @@ u.set_password("$ADMIN_PASS"); u.save()
 print("👉  Superuser password set.")
 PY
 
-  # Optional Git init ---------------------------------------------------------
+  # Git init (optional) -------------------------------------------------------
   if [[ $USE_GIT -eq 1 ]]; then
     git init -q
     git add . && git commit -qm "Initial Django project (automated)"
