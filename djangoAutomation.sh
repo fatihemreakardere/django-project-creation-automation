@@ -2,7 +2,7 @@
 # Django project bootstrap script – June 2025
 
 set -euo pipefail
-trap 'deactivate 2>/dev/null || true' EXIT   # always leave the venv cleanly
+trap 'deactivate 2>/dev/null || true' EXIT            # always leave the venv cleanly
 
 # ── Colour helpers ────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then
@@ -20,7 +20,7 @@ Options:
   -g, --with-git           Initialise a Git repo (the .gitignore is written regardless)
   -h, --help               Show this help and exit
 
-Environment (only when -y is used):
+Environment (honoured when -y is used):
   DJANGO_ADMIN_USER        (default: admin)
   DJANGO_ADMIN_EMAIL       (default: \$DJANGO_ADMIN_USER@<project>.com)
   DJANGO_ADMIN_PASSWORD    (default: admin)
@@ -31,7 +31,7 @@ EOF
 main() {
   local PROJECT="myproject" NONINTERACTIVE=0 USE_GIT=0
 
-  # Flag parser ---------------------------------------------------------------
+  # --- flag parser -----------------------------------------------------------
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -n|--name) PROJECT="$2"; shift 2 ;;
@@ -42,28 +42,28 @@ main() {
     esac
   done
 
-  # Ensure Python -------------------------------------------------------------
+  # --- ensure Python ---------------------------------------------------------
   if ! command -v python3 >/dev/null; then
     echo "${YELLOW}Python 3 not found – attempting to install…${RESET}"
     if   command -v apt-get >/dev/null; then
       sudo apt-get update -qq
       sudo apt-get install -y python3 python3-venv python3-pip build-essential libpq-dev
-    elif command -v brew >/dev/null;   then brew install python
-    elif command -v dnf  >/dev/null;   then
+    elif command -v brew >/dev/null;  then brew install python
+    elif command -v dnf  >/dev/null;  then
       sudo dnf install -y python3 python3-virtualenv python3-pip gcc postgresql-devel
     else
       echo "Package manager not recognised – install Python 3 manually."; exit 1
     fi
   fi
 
-  # Project skeleton ----------------------------------------------------------
+  # --- project skeleton ------------------------------------------------------
   mkdir -p "$PROJECT" && cd "$PROJECT"
 
   # .gitignore (always) -------------------------------------------------------
   if command -v curl >/dev/null &&
      curl -fsSL https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore \
           -o .gitignore; then
-    echo "/.env" >> .gitignore   # make sure secrets stay out of Git
+    echo -e "\n# Added by django_automation.sh\n.env\n.dockerignore" >> .gitignore
     echo "${GREEN}✔ Downloaded Python .gitignore.${RESET}"
   else
     cat > .gitignore <<'GI'
@@ -72,54 +72,118 @@ main() {
 __pycache__/
 *.py[cod]
 .env
+.dockerignore
 GI
     echo "${YELLOW}Used fallback .gitignore – install curl for full template.${RESET}"
   fi
 
-  # Virtual-env (.venv) -------------------------------------------------------
+  # --- virtual-env (.venv) ----------------------------------------------------
   python3 -m venv .venv
   # shellcheck source=/dev/null
   source .venv/bin/activate 2>/dev/null || source .venv/Scripts/activate
 
-  # Requirements (+python-decouple) ------------------------------------------
+  # requirements (+ python-decouple) ------------------------------------------
   cat > requirements.txt <<'REQ'
 Django>=5.2,<6
 djangorestframework>=3.15,<4
 python-decouple>=3.8,<4
 REQ
-
   python -m pip install -q --upgrade pip
   python -m pip install -q --no-cache-dir -r requirements.txt
 
-  # Django project inside src/ -----------------------------------------------
+  # --- Django project in src/ ------------------------------------------------
   mkdir -p src && cd src
   django-admin startproject "$PROJECT" .
   python manage.py migrate --noinput
 
-  # Generate .env -------------------------------------------------------------
+  # --- .env creation ---------------------------------------------------------
   local SECRET_KEY
   SECRET_KEY=$(python - <<PY
 import secrets, sys; print(secrets.token_urlsafe(50))
 PY
 )
   cat > ../.env <<ENV
-# Django settings read via python-decouple
+# Django settings (read via python-decouple)
 DEBUG=True
 SECRET_KEY=${SECRET_KEY}
 ALLOWED_HOSTS=127.0.0.1,localhost
 ENV
   echo "${GREEN}✔ .env generated.${RESET}"
 
-  # Patch settings.py to use decouple -----------------------------------------
+  # patch settings.py to use decouple -----------------------------------------
   local SETTINGS_FILE="$PROJECT/settings.py"
   sed -i "1i from decouple import config, Csv" "$SETTINGS_FILE"
-  sed -i "s/^SECRET_KEY = .*/SECRET_KEY = config('SECRET_KEY')/"     "$SETTINGS_FILE"
-  sed -i "s/^DEBUG = .*/DEBUG = config('DEBUG', cast=bool)/"         "$SETTINGS_FILE"
-  # Replace entire ALLOWED_HOSTS line (may span two lines in Django≥5.0)
+  sed -i "s/^SECRET_KEY = .*/SECRET_KEY = config('SECRET_KEY')/"      "$SETTINGS_FILE"
+  sed -i "s/^DEBUG = .*/DEBUG = config('DEBUG', cast=bool)/"          "$SETTINGS_FILE"
   sed -i "s/^ALLOWED_HOSTS.*/ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())/" \
-    "$SETTINGS_FILE"
+         "$SETTINGS_FILE"
 
-  # Super-user setup ----------------------------------------------------------
+  # --- Docker assets ---------------------------------------------------------
+  # 1) Dockerfile -------------------------------------------------------------
+  cat > ../Dockerfile <<'DOCK'
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# ── NEW: run from /app/src so 'manage.py' is at CWD ──
+WORKDIR /app/src
+
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+DOCK
+
+  # 2) docker-compose.yml -----------------------------------------------------
+  cat > ../docker-compose.yml <<COMPOSE
+version: "3.9"
+services:
+  web:
+    build: .
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    restart: unless-stopped
+    # Uncomment below to use an external database and add its service
+    # depends_on:
+    #   - db
+
+  # Example Postgres service (disabled by default)
+  # db:
+  #   image: postgres:16
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #     POSTGRES_DB: ${PROJECT}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data/
+
+# volumes:
+#   postgres_data:
+COMPOSE
+
+  # 3) .dockerignore ----------------------------------------------------------
+  cat > ../.dockerignore <<'DOCKERIGNORE'
+.venv
+__pycache__
+*.py[cod]
+.git
+.env
+DOCKERIGNORE
+
+  echo "${GREEN}✔ Dockerfile, docker-compose.yml & .dockerignore created.${RESET}"
+
+  # --- super-user setup ------------------------------------------------------
   if [[ $NONINTERACTIVE -eq 0 ]]; then
     read -rp "Admin username [admin]: "  ADMIN_USER;  ADMIN_USER=${ADMIN_USER:-admin}
     local DEFAULT_EMAIL="${ADMIN_USER}@${PROJECT}.com"
@@ -142,7 +206,7 @@ u.set_password("$ADMIN_PASS"); u.save()
 print("👉  Superuser password set.")
 PY
 
-  # Git init (optional) -------------------------------------------------------
+  # --- optional git init -----------------------------------------------------
   if [[ $USE_GIT -eq 1 ]]; then
     git init -q
     git add . && git commit -qm "Initial Django project (automated)"
@@ -152,6 +216,8 @@ PY
   echo -e "\n${GREEN}🎉  Done!${RESET}"
   echo "Activate your venv with ${BOLD}source .venv/bin/activate${RESET} and run:"
   echo "  ${BOLD}python manage.py runserver${RESET}  → http://127.0.0.1:8000/"
+  echo -e "\n${BOLD}Docker quick-start:${RESET}"
+  echo "  docker compose up --build"
 }
 
 main "$@"
