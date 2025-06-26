@@ -77,23 +77,33 @@ else
 fi
 
 # 👤 Create Django admin user
-read -p "Enter admin username (default as 'admin'): " ADMIN_USER
-read -p "Enter admin email (default as 'admin@your_project_name.com'): " ADMIN_EMAIL
-read -s -p "Enter admin password (default as 'admin'): " ADMIN_PASS
-echo
+create_superuser() {
+    read -p "Enter admin username (default as 'admin'): " ADMIN_USER
+    read -p "Enter admin email (default as 'admin@your_project_name.com'): " ADMIN_EMAIL
+    read -s -p "Enter admin password (default as 'admin'): " ADMIN_PASS
+    echo
 
-# Export credentials as environment variables
-export DJANGO_SUPERUSER_USERNAME="$ADMIN_USER"
-export DJANGO_SUPERUSER_EMAIL="$ADMIN_EMAIL"
-export DJANGO_SUPERUSER_PASSWORD="$ADMIN_PASS"
-export DJANGO_PROJECT_NAME="$PROJECT_NAME"
+    # Export credentials as environment variables
+    export DJANGO_SUPERUSER_USERNAME="$ADMIN_USER"
+    export DJANGO_SUPERUSER_EMAIL="$ADMIN_EMAIL"
+    export DJANGO_SUPERUSER_PASSWORD="$ADMIN_PASS"
+    export DJANGO_PROJECT_NAME="$PROJECT_NAME"
 
-# Download create_superuser.py from GitHub
-echo "⬇️ Downloading create_superuser.py from GitHub..."
-curl -s https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/create_superuser.py -o create_superuser.py
+    # Download create_superuser.py from GitHub
+    echo "⬇️ Downloading create_superuser.py from GitHub..."
+    curl -s https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/create_superuser.py -o create_superuser.py
 
-python3 manage.py shell < create_superuser.py
-rm create_superuser.py
+    python3 manage.py shell < create_superuser.py
+    rm create_superuser.py
+    echo "✅ Admin user created successfully."
+}
+
+read -p "Do you want to create a Django admin user? (y/n): " CREATE_ADMIN
+if [[ "$CREATE_ADMIN" == "y" ]]; then
+    create_superuser
+else
+    echo "ℹ️ Skipping admin user creation."
+fi
 
 # ✅ Project setup complete
 echo "✅ Django project '$PROJECT_NAME' created successfully in $PROJECT_DIR"
