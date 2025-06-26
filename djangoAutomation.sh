@@ -39,19 +39,30 @@ fi
 # Upgrade pip
 pip install --upgrade pip
 
+# Create requirements.txt
+echo "📄 Creating requirements.txt"
+cat <<EOL > requirements.txt
+django
+djangorestframework
+EOL
+
 # Install Django, DRF
 echo "📦 Installing Django, Django REST Framework"
-pip install django djangorestframework
+pip install -r requirements.txt
+
+# ✅ Download GitHub's Python .gitignore
+echo "⬇️ Downloading Python .gitignore from GitHub..."
+curl -s https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore -o .gitignore
+
+# Create src directory
+mkdir -p src
+cd src
 
 # Create Django project
 django-admin startproject "$PROJECT_NAME" .
 
 # Migrate DB
 python3 manage.py migrate
-
-# ✅ Download GitHub's Python .gitignore
-echo "⬇️ Downloading Python .gitignore from GitHub..."
-curl -s https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore -o .gitignore
 
 ## Init Git repo
 read -p "Do you want to initialize a Git repository? (y/n): " INIT_GIT
