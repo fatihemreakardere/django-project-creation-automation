@@ -71,21 +71,14 @@ read -p "Enter admin email: " ADMIN_EMAIL
 read -s -p "Enter admin password: " ADMIN_PASS
 echo
 
-# Create temporary Python script to create superuser
-cat <<EOF > create_superuser.py
-from django.contrib.auth import get_user_model
+# Export credentials as environment variables
+export DJANGO_SUPERUSER_USERNAME="$ADMIN_USER"
+export DJANGO_SUPERUSER_EMAIL="$ADMIN_EMAIL"
+export DJANGO_SUPERUSER_PASSWORD="$ADMIN_PASS"
 
-User = get_user_model()
-username = "$ADMIN_USER"
-email = "$ADMIN_EMAIL"
-password = "$ADMIN_PASS"
-
-if not User.objects.filter(username=username).exists():
-    User.objects.create_superuser(username=username, email=email, password=password)
-    print("✅ Superuser created successfully.")
-else:
-    print("ℹ️ Superuser already exists.")
-EOF
+# Download create_superuser.py from GitHub
+echo "⬇️ Downloading create_superuser.py from GitHub..."
+curl -s https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/create_superuser.py -o create_superuser.py
 
 python3 manage.py shell < create_superuser.py
 rm create_superuser.py
