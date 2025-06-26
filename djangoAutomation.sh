@@ -66,15 +66,16 @@ else
 fi
 
 # 👤 Create Django admin user
-read -p "Enter admin username: " ADMIN_USER
-read -p "Enter admin email: " ADMIN_EMAIL
-read -s -p "Enter admin password: " ADMIN_PASS
+read -p "Enter admin username (default as 'admin'): " ADMIN_USER
+read -p "Enter admin email (default as 'admin@your_project_name.com'): " ADMIN_EMAIL
+read -s -p "Enter admin password (default as 'admin'): " ADMIN_PASS
 echo
 
 # Export credentials as environment variables
 export DJANGO_SUPERUSER_USERNAME="$ADMIN_USER"
 export DJANGO_SUPERUSER_EMAIL="$ADMIN_EMAIL"
 export DJANGO_SUPERUSER_PASSWORD="$ADMIN_PASS"
+export DJANGO_PROJECT_NAME="$PROJECT_NAME"
 
 # Download create_superuser.py from GitHub
 echo "⬇️ Downloading create_superuser.py from GitHub..."
