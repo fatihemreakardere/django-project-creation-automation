@@ -1,115 +1,129 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Exit on error
-set -e
+set -euo pipefail
+trap 'deactivate 2>/dev/null || true' EXIT     # leave the venv cleanly
 
-# 📦 Install system dependencies
-check_updates() {
-    echo "🔍 Checking for updates and required packages..."
-    sudo apt update
-    sudo apt install -y python3-venv python3-pip curl
-    echo "✅ System packages installed."
+# ── Colour helpers ────────────────────────────────────────────────────────────
+if [[ -t 1 ]]; then
+  BOLD=$(tput bold) GREEN=$(tput setaf 2) YELLOW=$(tput setaf 3) RESET=$(tput sgr0)
+else
+  BOLD= GREEN= YELLOW= RESET=
+fi
+
+usage() { cat <<EOF
+${BOLD}Django project bootstrapper${RESET}
+
+Options:
+  -n, --name NAME          Django package / folder name   (default: myproject)
+  -y, --non-interactive    No prompts; rely on DJANGO_ADMIN_* env vars
+  -g, --with-git           Initialise a Git repo (the .gitignore is written regardless)
+  -h, --help               Show this help and exit
+
+Environment (only when -y is used):
+  DJANGO_ADMIN_USER        (default: admin)
+  DJANGO_ADMIN_EMAIL       (default: \$DJANGO_ADMIN_USER@<project>.com)
+  DJANGO_ADMIN_PASSWORD    (default: admin)
+EOF
 }
 
-check_updates
+# ── Main routine ──────────────────────────────────────────────────────────────
+main() {
+  local PROJECT="myproject" NONINTERACTIVE=0 USE_GIT=0
 
-# Prompt for project name
-read -p "Enter your Django project name: " PROJECT_NAME
+  # Flag parser ---------------------------------------------------------------
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -n|--name) PROJECT="$2"; shift 2 ;;
+      -y|--non-interactive) NONINTERACTIVE=1; shift ;;
+      -g|--with-git)        USE_GIT=1; shift ;;
+      -h|--help)            usage; exit 0 ;;
+      *) echo "Unknown option: $1"; usage; exit 1 ;;
+    esac
+  done
 
-# Set up directories
-BASE_DIR=$(pwd)
-PROJECT_DIR="$BASE_DIR/$PROJECT_NAME"
+  # Ensure Python -------------------------------------------------------------
+  if ! command -v python3 >/dev/null; then
+    echo "${YELLOW}Python 3 not found – attempting to install…${RESET}"
+    if   command -v apt-get >/dev/null; then
+      sudo apt-get update -qq
+      sudo apt-get install -y python3 python3-venv python3-pip build-essential libpq-dev
+    elif command -v brew >/dev/null; then brew install python
+    elif command -v dnf  >/dev/null; then
+      sudo dnf install -y python3 python3-virtualenv python3-pip gcc postgresql-devel
+    else
+      echo "Package manager not recognised – install Python 3 manually."; exit 1
+    fi
+  fi
 
-mkdir -p "$PROJECT_DIR"
-cd "$PROJECT_DIR"
+  # Project skeleton ----------------------------------------------------------
+  mkdir -p "$PROJECT" && cd "$PROJECT"
 
-# Create virtual environment
-python3 -m venv .venv
+  # Write .gitignore (always) --------------------------------------------------
+  if command -v curl >/dev/null && \
+     curl -fsSL https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore \
+          -o .gitignore; then
+    echo "${GREEN}✔ Downloaded Python .gitignore.${RESET}"
+  else
+    cat > .gitignore <<'GI'
+# Minimal Python .gitignore
+.venv/
+__pycache__/
+*.py[cod]
+GI
+    echo "${YELLOW}Used fallback .gitignore – install curl for full template.${RESET}"
+  fi
 
-# Activate virtual environment
-if [[ -f ".venv/bin/activate" ]]; then
-    source .venv/bin/activate
-elif [[ -f ".venv/Scripts/activate" ]]; then
-    source .venv/Scripts/activate
-else
-    echo "❌ Could not find the virtual environment activation script."
-    exit 1
-fi
+  # Virtual-env (.venv) -------------------------------------------------------
+  python3 -m venv .venv
+  # shellcheck source=/dev/null
+  source .venv/bin/activate 2>/dev/null || source .venv/Scripts/activate
 
-# Upgrade pip
-pip install --upgrade pip
+  # Dependencies --------------------------------------------------------------
+  cat > requirements.txt <<'REQ'
+Django>=5.2,<6
+djangorestframework>=3.15,<4
+REQ
+  python -m pip install -q --upgrade pip
+  python -m pip install -q --no-cache-dir -r requirements.txt
 
-# Create requirements.txt
-echo "📄 Creating requirements.txt"
-cat <<EOL > requirements.txt
-django
-djangorestframework
-EOL
+  # Django project in src/ ----------------------------------------------------
+  mkdir -p src && cd src
+  django-admin startproject "$PROJECT" .
+  python manage.py migrate --noinput
 
-# Install Django, DRF
-echo "📦 Installing Django, Django REST Framework"
-pip install -r requirements.txt
+  # Super-user setup ----------------------------------------------------------
+  if [[ $NONINTERACTIVE -eq 0 ]]; then
+    read -rp "Admin username [admin]: "  ADMIN_USER;  ADMIN_USER=${ADMIN_USER:-admin}
+    local DEFAULT_EMAIL="${ADMIN_USER}@${PROJECT}.com"
+    read -rp "Admin email [${DEFAULT_EMAIL}]: " ADMIN_EMAIL
+    ADMIN_EMAIL=${ADMIN_EMAIL:-$DEFAULT_EMAIL}
+    read -srp "Admin password [admin]: "         ADMIN_PASS; echo
+    ADMIN_PASS=${ADMIN_PASS:-admin}
+  else
+    ADMIN_USER="${DJANGO_ADMIN_USER:-admin}"
+    ADMIN_EMAIL="${DJANGO_ADMIN_EMAIL:-${ADMIN_USER}@${PROJECT}.com}"
+    ADMIN_PASS="${DJANGO_ADMIN_PASSWORD:-admin}"
+  fi
 
-# ✅ Download GitHub's Python .gitignore
-echo "⬇️ Downloading Python .gitignore from GitHub..."
-curl -s https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore -o .gitignore
+  python manage.py createsuperuser --username "$ADMIN_USER" \
+                                   --email    "$ADMIN_EMAIL" --noinput
+  python manage.py shell <<PY
+from django.contrib.auth import get_user_model
+u = get_user_model().objects.get(username="$ADMIN_USER")
+u.set_password("$ADMIN_PASS"); u.save()
+print("👉  Superuser password set.")
+PY
 
-# Create src directory
-mkdir -p src
-cd src
+  # Optional Git init ---------------------------------------------------------
+  if [[ $USE_GIT -eq 1 ]]; then
+    git init -q
+    git add . && git commit -qm "Initial Django project (automated)"
+    echo "${GREEN}✔ Git repository initialised.${RESET}"
+  fi
 
-# Create Django project
-django-admin startproject "$PROJECT_NAME" .
-
-# Migrate DB
-python3 manage.py migrate
-
-## Init Git repo
-read -p "Do you want to initialize a Git repository? (y/n): " INIT_GIT
-if [[ "$INIT_GIT" == "y" ]]; then
-    echo "📂 Initializing Git repository..."
-    git init
-    git add .
-    git commit -m "Initial commit: Django project setup"
-    echo "✅ Git repository initialized."
-else
-    echo "ℹ️ Skipping Git repository initialization."
-fi
-
-# 👤 Create Django admin user
-create_superuser() {
-    read -p "Enter admin username (default as 'admin'): " ADMIN_USER
-    read -p "Enter admin email (default as 'admin@your_project_name.com'): " ADMIN_EMAIL
-    read -s -p "Enter admin password (default as 'admin'): " ADMIN_PASS
-    echo
-
-    # Export credentials as environment variables
-    export DJANGO_SUPERUSER_USERNAME="$ADMIN_USER"
-    export DJANGO_SUPERUSER_EMAIL="$ADMIN_EMAIL"
-    export DJANGO_SUPERUSER_PASSWORD="$ADMIN_PASS"
-    export DJANGO_PROJECT_NAME="$PROJECT_NAME"
-
-    # Download create_superuser.py from GitHub
-    echo "⬇️ Downloading create_superuser.py from GitHub..."
-    curl -s https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/create_superuser.py -o create_superuser.py
-
-    python3 manage.py shell < create_superuser.py
-    rm create_superuser.py
-    echo "✅ Admin user created successfully."
+  echo -e "\n${GREEN}🎉  Done!${RESET}"
+  echo "Activate your venv with ${BOLD}source .venv/bin/activate${RESET} and run:"
+  echo "  ${BOLD}python manage.py runserver${RESET}  → http://127.0.0.1:8000/"
 }
 
-read -p "Do you want to create a Django admin user? (y/n): " CREATE_ADMIN
-if [[ "$CREATE_ADMIN" == "y" ]]; then
-    create_superuser
-else
-    echo "ℹ️ Skipping admin user creation."
-fi
-
-# ✅ Project setup complete
-echo "✅ Django project '$PROJECT_NAME' created successfully in $PROJECT_DIR"
-
-# Prompt to run server
-read -p "Do you want to run the development server? (y/n): " RUNSERVER
-if [[ "$RUNSERVER" == "y" ]]; then
-    python3 manage.py runserver
-fi
+main "$@"
