@@ -6,6 +6,7 @@ trap 'deactivate 2>/dev/null || true' EXIT
 
 ###############################################################################
 DOCKER_TEMPLATE_BASE="https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/docker"
+USERS_TEMPLATE_BASE="https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/python/users"
 
 # Tiny colour helpers
 ###############################################################################
@@ -98,26 +99,14 @@ if [[ $CREATE_USERS -eq 1 && ! -d users ]]; then
   # a) register in INSTALLED_APPS
   sed -i "/INSTALLED_APPS = \[/a\    'users'," "$PROJECT/settings.py"
 
-  # b) create users/urls.py
-  cat > users/urls.py <<'PY'
-from django.urls import path
-from . import views
+  # b) fetch urls.py and views.py from template repo
+  for f in urls.py views.py; do
+    curl -fsSL "${USERS_TEMPLATE_BASE}/${f}" -o "users/${f}" \
+      || { echo "${YELLOW}Failed to fetch users/${f} – check template repo URL${RESET}"; exit 1; }
+    echo "${GREEN}✔ users/${f} downloaded.${RESET}"
+  done
 
-urlpatterns = [
-    path('', views.index, name='users-index'),
-]
-PY
-
-  # c) add a minimal view stub (so runserver won't crash)
-  cat >> users/views.py <<'PY'
-
-from django.http import HttpResponse
-
-def index(request):
-    return HttpResponse("Users app index page")
-PY
-
-# d) include users.urls in the project router
+  # c) include users.urls in project router
   sed -i "s|from django.urls import path|from django.urls import path, include|" \
         "$PROJECT/urls.py"
   sed -i "/urlpatterns = \[/a\    path('users/', include('users.urls'))," \
