@@ -90,6 +90,7 @@ done
 Django>=5.2,<6
 djangorestframework>=3.15,<4
 python-decouple>=3.8,<4
+dj-database-url>=2,<3
 gunicorn>=21,<22
 whitenoise>=6,<7
 REQ
@@ -135,6 +136,8 @@ DEBUG=True
 SECRET_KEY=${SECRET_KEY}
 ALLOWED_HOSTS=127.0.0.1,localhost
 CSRF_TRUSTED_ORIGINS=https://127.0.0.1,https://localhost
+# Switch to Postgres by uncommenting the next line:
+# DATABASE_URL=postgres://postgres:postgres@db:5432/${PROJECT}
 ENV
   echo "${GREEN}✔ .env generated.${RESET}"
 
@@ -151,6 +154,11 @@ ENV
   sed -i "/CSRF_TRUSTED_ORIGINS/a STATIC_ROOT = BASE_DIR / 'staticfiles'\nSTATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'" "$PROJECT/settings.py"
   # add WhiteNoise middleware just after SecurityMiddleware
   sed -i "s/'django.middleware.security.SecurityMiddleware',/'django.middleware.security.SecurityMiddleware',\n    'whitenoise.middleware.WhiteNoiseMiddleware',/" "$PROJECT/settings.py"
+  # Database config via dj-database-url
+sed -i "/from decouple import/a import dj_database_url" "$PROJECT/settings.py"
+
+sed -i "/^DATABASES = {/,+6c\DATABASES = {\n    'default': dj_database_url.config(\n        default='sqlite:///db.sqlite3',\n        conn_max_age=600,\n        ssl_require=False,\n    )\n}" "$PROJECT/settings.py"
+  
   cd ..
 
   # --------------- download Docker assets -----------------------------------
