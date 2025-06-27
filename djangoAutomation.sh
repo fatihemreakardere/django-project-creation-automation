@@ -93,6 +93,7 @@ python-decouple>=3.8,<4
 dj-database-url>=2,<3
 gunicorn>=21,<22
 whitenoise>=6,<7
+psycopg[binary]>=3.1,<4
 REQ
   python -m pip install -q --upgrade pip
   python -m pip install -q --no-cache-dir -r requirements.txt
