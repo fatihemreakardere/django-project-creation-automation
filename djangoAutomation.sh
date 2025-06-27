@@ -22,6 +22,7 @@ Options:
   -n, --name NAME          Django package / folder name   (default: myproject)
   -y, --non-interactive    No prompts; rely on DJANGO_ADMIN_* env vars
   -g, --with-git           Initialise a Git repo (the .gitignore is written regardless)
+  --no-users               Skip user app creation (useful for API-only projects)
   -h, --help               Show this help and exit
 
 Environment (honoured when -y is used):
@@ -43,7 +44,7 @@ while [[ $# -gt 0 ]]; do
     -n|--name)             PROJECT="$2"; shift 2 ;;
     -y|--non-interactive)  NONINTERACTIVE=1; shift ;;
     -g|--with-git)         USE_GIT=1; shift ;;
-    --no-users)            CREATE_USERS=0; shift ;;      # NEW FLAG
+    --no-users)            CREATE_USERS=0; shift ;;
     -h|--help)             usage; exit 0 ;;
     *) echo "Unknown option: $1"; usage; exit 1 ;;
   esac
@@ -93,7 +94,34 @@ REQ
   # ── users app ────────────────────────────────────────────────
 if [[ $CREATE_USERS -eq 1 && ! -d users ]]; then
   python manage.py startapp users
+
+  # a) register in INSTALLED_APPS
   sed -i "/INSTALLED_APPS = \[/a\    'users'," "$PROJECT/settings.py"
+
+  # b) create users/urls.py
+  cat > users/urls.py <<'PY'
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.index, name='users-index'),
+]
+PY
+
+  # c) add a minimal view stub (so runserver won't crash)
+  cat >> users/views.py <<'PY'
+
+from django.http import HttpResponse
+
+def index(request):
+    return HttpResponse("Users app index page")
+PY
+
+# d) include users.urls in the project router
+  sed -i "s|from django.urls import path|from django.urls import path, include|" \
+        "$PROJECT/urls.py"
+  sed -i "/urlpatterns = \[/a\    path('users/', include('users.urls'))," \
+        "$PROJECT/urls.py"
 fi
   sed -i "/INSTALLED_APPS = \[/a\    'rest_framework'," "$PROJECT/settings.py"
 
