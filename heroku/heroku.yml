@@ -1,0 +1,11 @@
+# Deploy with:  heroku stack:set container
+# Then:          git push heroku main
+build:
+  docker:
+    web: Dockerfile
+
+run:
+  web: |
+    gunicorn src.<project>.wsgi:application \
+             --bind 0.0.0.0:${PORT:-8000} \
+             --log-file -
