@@ -132,6 +132,7 @@ PY
 DEBUG=True
 SECRET_KEY=${SECRET_KEY}
 ALLOWED_HOSTS=127.0.0.1,localhost
+CSRF_TRUSTED_ORIGINS=https://127.0.0.1,https://localhost
 ENV
   echo "${GREEN}✔ .env generated.${RESET}"
 
@@ -141,6 +142,8 @@ ENV
   sed -i "s/^DEBUG = .*/DEBUG = config('DEBUG', cast=bool)/"          "$PROJECT/settings.py"
   sed -i "s/^ALLOWED_HOSTS.*/ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())/" \
          "$PROJECT/settings.py"
+  sed -i "/ALLOWED_HOSTS/a CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv(), default=[])\
+         " "$PROJECT/settings.py"
   cd ..
 
   # --------------- download Docker assets -----------------------------------
