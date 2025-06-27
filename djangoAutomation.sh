@@ -90,6 +90,8 @@ done
 Django>=5.2,<6
 djangorestframework>=3.15,<4
 python-decouple>=3.8,<4
+gunicorn>=21,<22
+whitenoise>=6,<7
 REQ
   python -m pip install -q --upgrade pip
   python -m pip install -q --no-cache-dir -r requirements.txt
@@ -142,8 +144,13 @@ ENV
   sed -i "s/^DEBUG = .*/DEBUG = config('DEBUG', cast=bool)/"          "$PROJECT/settings.py"
   sed -i "s/^ALLOWED_HOSTS.*/ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())/" \
          "$PROJECT/settings.py"
+  # CSRF_TRUSTED_ORIGINS for CSRF protection (admin panel)
   sed -i "/ALLOWED_HOSTS/a CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv(), default=[])\
          " "$PROJECT/settings.py"
+  # STATIC_ROOT & WhiteNoise
+  sed -i "/CSRF_TRUSTED_ORIGINS/a STATIC_ROOT = BASE_DIR / 'staticfiles'\nSTATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'" "$PROJECT/settings.py"
+  # add WhiteNoise middleware just after SecurityMiddleware
+  sed -i "s/'django.middleware.security.SecurityMiddleware',/'django.middleware.security.SecurityMiddleware',\n    'whitenoise.middleware.WhiteNoiseMiddleware',/" "$PROJECT/settings.py"
   cd ..
 
   # --------------- download Docker assets -----------------------------------
