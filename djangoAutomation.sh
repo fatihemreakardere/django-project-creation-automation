@@ -36,15 +36,18 @@ main() {
   local PROJECT="myproject" NONINTERACTIVE=0 USE_GIT=0
 
   # --------------- flag parser ----------------------------------------------
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      -n|--name)           PROJECT="$2"; shift 2 ;;
-      -y|--non-interactive)NONINTERACTIVE=1; shift ;;
-      -g|--with-git)       USE_GIT=1; shift ;;
-      -h|--help)           usage; exit 0 ;;
-      *) echo "Unknown option: $1"; usage; exit 1 ;;
-    esac
-  done
+CREATE_USERS=1
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--name)             PROJECT="$2"; shift 2 ;;
+    -y|--non-interactive)  NONINTERACTIVE=1; shift ;;
+    -g|--with-git)         USE_GIT=1; shift ;;
+    --no-users)            CREATE_USERS=0; shift ;;      # NEW FLAG
+    -h|--help)             usage; exit 0 ;;
+    *) echo "Unknown option: $1"; usage; exit 1 ;;
+  esac
+done
 
   # --------------- ensure Python --------------------------------------------
   if ! command -v python3 >/dev/null; then
@@ -86,6 +89,15 @@ REQ
   # --------------- Django project inside src/ -------------------------------
   mkdir -p src && cd src
   django-admin startproject "$PROJECT" .
+
+  # ── users app ────────────────────────────────────────────────
+if [[ $CREATE_USERS -eq 1 && ! -d users ]]; then
+  python manage.py startapp users
+  sed -i "/INSTALLED_APPS = \[/a\    'users'," "$PROJECT/settings.py"
+fi
+  sed -i "/INSTALLED_APPS = \[/a\    'rest_framework'," "$PROJECT/settings.py"
+
+  python manage.py makemigrations --noinput
   python manage.py migrate --noinput
 
   # --------------- .env ------------------------------------------------------
