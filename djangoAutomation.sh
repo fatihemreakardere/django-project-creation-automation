@@ -7,6 +7,7 @@ trap 'deactivate 2>/dev/null || true' EXIT
 ###############################################################################
 DOCKER_TEMPLATE_BASE="https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/docker"
 USERS_TEMPLATE_BASE="https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/python/users"
+HEROKU_TEMPLATE_BASE="https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/heroku"
 
 # Tiny colour helpers
 ###############################################################################
@@ -24,6 +25,7 @@ Options:
   -y, --non-interactive    No prompts; rely on DJANGO_ADMIN_* env vars
   -g, --with-git           Initialise a Git repo (the .gitignore is written regardless)
   --no-users               Skip user app creation (useful for API-only projects)
+  --heroku                 Fetch heroku.yml for container deploy
   -h, --help               Show this help and exit
 
 Environment (honoured when -y is used):
@@ -35,10 +37,13 @@ EOF
 
 ###############################################################################
 main() {
-  local PROJECT="myproject" NONINTERACTIVE=0 USE_GIT=0
+  local PROJECT="myproject"
 
   # --------------- flag parser ----------------------------------------------
 CREATE_USERS=1
+NONINTERACTIVE=0
+USE_GIT=0
+USE_HEROKU=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -46,6 +51,7 @@ while [[ $# -gt 0 ]]; do
     -y|--non-interactive)  NONINTERACTIVE=1; shift ;;
     -g|--with-git)         USE_GIT=1; shift ;;
     --no-users)            CREATE_USERS=0; shift ;;
+    --heroku)              USE_HEROKU=1; shift ;;
     -h|--help)             usage; exit 0 ;;
     *) echo "Unknown option: $1"; usage; exit 1 ;;
   esac
@@ -143,6 +149,14 @@ ENV
       || { echo "${YELLOW}Failed to fetch ${FILE} – check template repo URL${RESET}"; exit 1; }
     echo "${GREEN}✔ ${FILE} downloaded.${RESET}"
   done
+
+  # ---------------- Heroku container deploy -----------------------------------
+  if [[ $USE_HEROKU -eq 1 ]]; then
+    curl -fsSL "${HEROKU_TEMPLATE_BASE}/heroku.yml" -o heroku.yml \
+      || { echo "${YELLOW}Failed to fetch heroku.yml – check template repo URL${RESET}"; exit 1; }
+    sed -i "s|<project>|${PROJECT}|g" heroku.yml
+    echo "${GREEN}✔ heroku.yml downloaded.${RESET}"
+  fi
 
   # --------------- super user -----------------------------------------------
   if [[ $NONINTERACTIVE -eq 0 ]]; then
