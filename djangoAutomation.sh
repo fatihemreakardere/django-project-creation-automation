@@ -147,7 +147,7 @@ ENV
   cd ..
 
   # --------------- download Docker assets -----------------------------------
-  for FILE in Dockerfile docker-compose.yml .dockerignore; do
+  for FILE in Dockerfile docker-compose.yml .dockerignore entrypoint.sh; do
     curl -fsSL "${DOCKER_TEMPLATE_BASE}/${FILE}" -o "${FILE}" \
       || { echo "${YELLOW}Failed to fetch ${FILE} – check template repo URL${RESET}"; exit 1; }
     echo "${GREEN}✔ ${FILE} downloaded.${RESET}"

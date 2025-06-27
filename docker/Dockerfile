@@ -11,7 +11,13 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY . .
 
+# copy entrypoint and make it executable
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
 # Work from src/ so manage.py is at CWD
 WORKDIR /app/src
 
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+ENTRYPOINT ["../entrypoint.sh"]  
+
+CMD ["gunicorn", "<project>.wsgi:application", "--bind", "0.0.0.0:8000"]
