@@ -8,6 +8,7 @@ trap 'deactivate 2>/dev/null || true' EXIT
 DOCKER_TEMPLATE_BASE="https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/docker"
 USERS_TEMPLATE_BASE="https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/python/users"
 HEROKU_TEMPLATE_BASE="https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/heroku"
+GITATTR_URL="https://raw.githubusercontent.com/fatihemreakardere/django-project-creation-automation/refs/heads/main/.gitattributes"
 
 # Tiny colour helpers
 ###############################################################################
@@ -79,6 +80,11 @@ done
        -o .gitignore
   echo -e "\n# Added by django_automation.sh\n.env\n.dockerignore" >> .gitignore
   echo "${GREEN}✔ .gitignore downloaded.${RESET}"
+
+  # --------------- .gitattributes (always) ------------------------------------
+  curl -fsSL "${GITATTR_URL}" -o .gitattributes \
+    || { echo "${YELLOW}Failed to fetch .gitattributes – check template repo URL${RESET}"; exit 1; }
+  echo "${GREEN}✔ .gitattributes downloaded.${RESET}"
 
   # --------------- virtual env (.venv) --------------------------------------
   python3 -m venv .venv
