@@ -175,7 +175,8 @@ sed -i "/^DATABASES = {/,+6c\DATABASES = {\n    'default': dj_database_url.confi
       || { echo "${YELLOW}Failed to fetch ${FILE} – check template repo URL${RESET}"; exit 1; }
     echo "${GREEN}✔ ${FILE} downloaded.${RESET}"
   done
-
+  # Replace <project> placeholder in Dockerfile
+  sed -i "s|<project>|${PROJECT}|g" Dockerfile
   # ---------------- Heroku container deploy -----------------------------------
   if [[ $USE_HEROKU -eq 1 ]]; then
     curl -fsSL "${HEROKU_TEMPLATE_BASE}/heroku.yml" -o heroku.yml \
