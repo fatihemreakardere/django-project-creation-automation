@@ -133,6 +133,7 @@ import secrets,sys; print(secrets.token_urlsafe(50))
 PY
 )
   cat > ../.env <<ENV
+PROJECT=${PROJECT}
 DEBUG=True
 SECRET_KEY=${SECRET_KEY}
 ALLOWED_HOSTS=127.0.0.1,localhost
