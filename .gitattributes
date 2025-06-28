@@ -1,0 +1,30 @@
+# -----------------------------------------------------------------------------
+# Force LF endings for all POSIX shell & PowerShell scripts
+# -----------------------------------------------------------------------------
+*.sh   text eol=lf
+*.ps1  text eol=lf
+
+# -----------------------------------------------------------------------------
+# Treat these as text so Git can diff/merge them sensibly
+# -----------------------------------------------------------------------------
+*.py          text
+*.yml         text
+*.yaml        text
+*.json        text
+*.md          text
+*.env         text
+Dockerfile    text
+
+# -----------------------------------------------------------------------------
+# Binary formats (never modify)
+# -----------------------------------------------------------------------------
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.svg  text      # SVG is XML—keep as text
+
+# -----------------------------------------------------------------------------
+# Catch-all: let Git auto-detect for anything not listed above
+# -----------------------------------------------------------------------------
