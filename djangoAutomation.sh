@@ -176,6 +176,7 @@ sed -i "/^DATABASES = {/,+6c\DATABASES = {\n    'default': dj_database_url.confi
     sed -i "s|<project>|${PROJECT}|g" heroku.yml
     echo "${GREEN}✔ heroku.yml downloaded.${RESET}"
   fi
+  #heroku stack:set container -a your-app-name // for setting up Heroku stack
 
   # --------------- super user -----------------------------------------------
   if [[ $NONINTERACTIVE -eq 0 ]]; then
